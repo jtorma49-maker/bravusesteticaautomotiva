@@ -1,76 +1,71 @@
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", function () {
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- REVEAL AO ROLAR (seções + itens com stagger) ---------- */
   const observerOptions = {
     root: null,
-    rootMargin: '0px',
-    threshold: 0.15 // A animação dispara quando 15% da seção aparece na tela
+    rootMargin: '0px 0px -40px 0px',
+    threshold: 0.15
   };
 
-  const observer = new IntersectionObserver((entries, observer) => {
+  const observer = new IntersectionObserver((entries, obs) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         entry.target.classList.add('active');
+        obs.unobserve(entry.target); // anima uma vez só, economiza processamento
       }
     });
   }, observerOptions);
 
-  document.querySelectorAll('.reveal').forEach(section => {
-    observer.observe(section);
+  // Seções principais (comportamento original)
+  document.querySelectorAll('.reveal').forEach(section => observer.observe(section));
+
+  // Itens individuais com efeito cascata (stagger)
+  function setupStagger(selector, groupSelector, step) {
+    document.querySelectorAll(groupSelector).forEach(group => {
+      const items = group.querySelectorAll(selector);
+      items.forEach((item, i) => {
+        item.classList.add('reveal-item');
+        if (!prefersReducedMotion) {
+          item.style.transitionDelay = `${i * step}ms`;
+        }
+        observer.observe(item);
+      });
+    });
+  }
+
+  setupStagger('.service-card', '.service-cards', 90);
+  setupStagger('.gallery-item', '.gallery-grid', 70);
+  setupStagger('.contact-item', '.contact-info', 90);
+
+  /* ---------- HERO: entrada suave ao carregar (não depende de scroll) ---------- */
+  const heroEls = document.querySelectorAll('.hero .eyebrow, .hero h1, .hero p, .hero-cta');
+  heroEls.forEach((el, i) => {
+    el.classList.add('hero-in');
+    if (!prefersReducedMotion) {
+      el.style.transitionDelay = `${150 + i * 110}ms`;
+    }
+  });
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      heroEls.forEach(el => el.classList.add('active'));
+    });
   });
 
-  // ---------- CARROSSEL DE TRABALHOS ----------
-  const carousel = document.getElementById('carousel');
-  const track = document.getElementById('carouselTrack');
-  const dotsWrap = document.getElementById('carouselDots');
-  const prevBtn = document.getElementById('carouselPrev');
-  const nextBtn = document.getElementById('carouselNext');
-
-  if (carousel && track) {
-    const slides = Array.from(track.querySelectorAll('.carousel-slide'));
-    let current = slides.findIndex(s => s.classList.contains('is-active'));
-    if (current < 0) current = 0;
-    const AUTOPLAY_MS = 8000;
-    let timer = null;
-
-    // Criar os pontos (dots) de navegação
-    slides.forEach((_, i) => {
-      const dot = document.createElement('button');
-      dot.className = 'dot' + (i === current ? ' is-active' : '');
-      dot.setAttribute('aria-label', `Ir para foto ${i + 1}`);
-      dot.addEventListener('click', () => goTo(i));
-      dotsWrap.appendChild(dot);
-    });
-    const dots = Array.from(dotsWrap.querySelectorAll('.dot'));
-
-    function render() {
-      slides.forEach((slide, i) => slide.classList.toggle('is-active', i === current));
-      dots.forEach((dot, i) => dot.classList.toggle('is-active', i === current));
-    }
-
-    function goTo(index) {
-      current = (index + slides.length) % slides.length;
-      render();
-      resetTimer();
-    }
-
-    function next() { goTo(current + 1); }
-    function prev() { goTo(current - 1); }
-
-    function startTimer() {
-      timer = setInterval(next, AUTOPLAY_MS);
-    }
-    function resetTimer() {
-      clearInterval(timer);
-      startTimer();
-    }
-
-    nextBtn.addEventListener('click', next);
-    prevBtn.addEventListener('click', prev);
-
-    // Pausa o autoplay ao passar o mouse, retoma ao sair
-    carousel.addEventListener('mouseenter', () => clearInterval(timer));
-    carousel.addEventListener('mouseleave', startTimer);
-
-    render();
-    startTimer();
+  /* ---------- HEADER: reduz e escurece ao rolar ---------- */
+  const header = document.querySelector('header');
+  if (header) {
+    let ticking = false;
+    const updateHeader = () => {
+      header.classList.toggle('is-scrolled', window.scrollY > 24);
+      ticking = false;
+    };
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        requestAnimationFrame(updateHeader);
+        ticking = true;
+      }
+    }, { passive: true });
+    updateHeader();
   }
 });
